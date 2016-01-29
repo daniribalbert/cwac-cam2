@@ -18,11 +18,13 @@ import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import android.util.Log;
+
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
 import de.greenrobot.event.EventBus;
 
 /**
@@ -124,6 +126,30 @@ abstract public class CameraEngine {
 
   public static class OrientationChangedEvent {
 
+  }
+
+  /**
+   * Event raised when zooming in/out.
+   * Subscribe to this event if you want to
+   * receive zoom updates.
+   * May include an exception if there was
+   * an exception accessing the camera.
+   */
+  public static class ZoomEvent extends CrashableEvent{
+
+    public enum ZoomType{ZOOM_IN, ZOOM_OUT}
+
+    private ZoomType mType;
+
+    public ZoomEvent(ZoomType eventType){
+      mType = eventType;
+    }
+
+    public ZoomEvent(Exception exception){ super(exception); }
+
+    public ZoomType getEventType(){
+      return mType;
+    }
   }
 
   /**
@@ -279,6 +305,8 @@ abstract public class CameraEngine {
 
   abstract public void handleOrientationChange(CameraSession session,
                                                OrientationChangedEvent event);
+
+  abstract public void handleZoomChange(CameraSession session, ZoomEvent.ZoomType type);
 
   /**
    * Builds a CameraEngine instance based on the device's

@@ -15,7 +15,6 @@
 package com.commonsware.cwac.cam2;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
@@ -23,12 +22,10 @@ import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.media.MediaRecorder;
 import android.os.Build;
-import android.os.Environment;
 import android.util.Log;
-import android.view.Surface;
-import android.view.WindowManager;
+
 import com.commonsware.cwac.cam2.util.Size;
-import java.io.File;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -135,7 +132,7 @@ public class ClassicCameraEngine extends CameraEngine
           }
         });
 
-        getBus().post(new CameraEngine.CameraDescriptorsEvent(result));
+        getBus().post(new CameraDescriptorsEvent(result));
       }
     });
   }
@@ -317,6 +314,33 @@ public class ClassicCameraEngine extends CameraEngine
     if (session!=null) {
       ((Session)session).configureStillCamera(true);
     }
+  }
+
+  @Override
+  public void handleZoomChange(CameraSession session, ZoomEvent.ZoomType eventType) {
+    if (session == null) {
+      return;
+    }
+    final Descriptor descriptor=(Descriptor)session.getDescriptor();
+    final Camera camera= descriptor.getCamera();
+    final Camera.Parameters params = camera.getParameters();
+    if (!params.isZoomSupported()){
+      return;
+    }
+
+    switch (eventType) {
+      case ZOOM_IN:
+        if (params.getZoom() < params.getMaxZoom()) {
+          params.setZoom(params.getZoom() + 1);
+        }
+        break;
+      case ZOOM_OUT:
+        if (params.getZoom() > 0) {
+          params.setZoom(params.getZoom() - 1);
+        }
+        break;
+    }
+    camera.setParameters(params);
   }
 
   @Override

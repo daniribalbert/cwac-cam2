@@ -16,8 +16,8 @@ package com.commonsware.cwac.cam2;
 
 import android.annotation.TargetApi;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.ImageFormat;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -38,9 +38,10 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.view.Surface;
-import android.view.WindowManager;
+
 import com.commonsware.cwac.cam2.util.Size;
-import java.io.File;
+import com.commonsware.cwac.cam2.util.Utils;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,6 +51,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
 import de.greenrobot.event.EventBus;
 
 /**
@@ -68,6 +70,7 @@ public class CameraTwoEngine extends CameraEngine {
   private CountDownLatch closeLatch=null;
   private MediaActionSound shutter=new MediaActionSound();
   private List<Descriptor> descriptors=null;
+  private float mZoom = 1.0f;
 
   /**
    * Standard constructor
@@ -133,7 +136,7 @@ public class CameraTwoEngine extends CameraEngine {
           }
           catch (CameraAccessException e) {
             getBus().post(
-              new CameraEngine.CameraDescriptorsEvent(e));
+              new CameraDescriptorsEvent(e));
 
             if (isDebug()) {
               Log.e(getClass().getSimpleName(),
@@ -168,7 +171,7 @@ public class CameraTwoEngine extends CameraEngine {
           });
 
         getBus().post(
-          new CameraEngine.CameraDescriptorsEvent(result));
+          new CameraDescriptorsEvent(result));
       }
     });
   }
@@ -285,6 +288,74 @@ public class CameraTwoEngine extends CameraEngine {
   }
 
   @Override
+  public void handleZoomChange(CameraSession session, ZoomEvent.ZoomType eventType){
+      if (session == null) {
+          return;
+      }
+      Session currentSession = (Session) session;
+      if (currentSession.previewRequest == null) {
+          return;
+      }
+    try {
+        handleDigitalZoom(currentSession, eventType);
+      }catch (CameraAccessException e) {
+        getBus().post(new ZoomEvent(e));
+      }
+  }
+
+  /**
+   * Handles digital zoom on the current session.
+   * @param session current camera session.
+   * @param eventType Zoom-in or Zoom-out.
+   * @throws CameraAccessException exception.
+   */
+  private void handleDigitalZoom(Session session, ZoomEvent.ZoomType eventType)
+          throws CameraAccessException {
+    final Descriptor descriptor = (Descriptor) session.getDescriptor();
+    // Get list of available focal lengths for optical zoom.
+    CameraCharacteristics camCharacteristics = mgr.getCameraCharacteristics(descriptor.cameraId);
+
+    float maxDigitalZoom = 1f;
+    try {
+      maxDigitalZoom =
+              camCharacteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+    } catch (NullPointerException exception) {
+      Log.e(getClass().getSimpleName(), "Digital zoom not available");
+      return;
+    }
+
+    if (maxDigitalZoom <= 1) {
+      Log.e(getClass().getSimpleName(), "Digital zoom not available");
+      return;
+    }
+
+    // Calculate next crop Rect.
+    Rect zoomedRect = null;
+    float nextZoomLevel = mZoom;
+    switch (eventType) {
+      case ZOOM_IN:
+        nextZoomLevel += 0.1f;
+        break;
+      case ZOOM_OUT:
+        nextZoomLevel -= 0.1f;
+        break;
+    }
+
+    // Check zoom boundaries.
+      if (nextZoomLevel < 1 || nextZoomLevel > maxDigitalZoom) {
+        Log.e(getClass().getSimpleName(), "Max/Min zoom reached!");
+      } else {
+        mZoom =nextZoomLevel;
+        zoomedRect = Utils.cropRegionForZoom(camCharacteristics, mZoom);
+        session.previewRequestBuilder
+          .set(CaptureRequest.SCALER_CROP_REGION, zoomedRect);
+        descriptor.setCurrentZoomRect(zoomedRect);
+        session.previewRequest = session.previewRequestBuilder.build();
+        session.captureSession.setRepeatingRequest(session.previewRequest, null, handler);
+    }
+  }
+
+  @Override
   public void recordVideo(CameraSession session, VideoTransaction xact) {
     // TODO
   }
@@ -366,10 +437,15 @@ public class CameraTwoEngine extends CameraEngine {
           s.previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
               CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
           s.previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
-              CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+                  CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
 
           Descriptor camera=(Descriptor)s.getDescriptor();
           CameraCharacteristics cc=mgr.getCameraCharacteristics(camera.cameraId);
+          if (camera.getCurrentZoomRect() != null){
+            s.previewRequestBuilder
+                    .set(CaptureRequest.SCALER_CROP_REGION,
+                            camera.getCurrentZoomRect());
+          }
 
           s.addToPreviewRequest(cc, s.previewRequestBuilder);
 
@@ -378,6 +454,7 @@ public class CameraTwoEngine extends CameraEngine {
           session.setRepeatingRequest(s.previewRequest, null, handler);
 
           getBus().post(new OpenedEvent());
+          Log.d(getClass().getSimpleName(), "ON CONFIGURED");
         }
       }
       catch (CameraAccessException e) {
@@ -493,6 +570,12 @@ public class CameraTwoEngine extends CameraEngine {
         Descriptor camera=(Descriptor)s.getDescriptor();
         CameraCharacteristics cc=mgr.getCameraCharacteristics(camera.cameraId);
 
+        if (camera.getCurrentZoomRect() != null) {
+          captureBuilder
+                  .set(CaptureRequest.SCALER_CROP_REGION,
+                          camera.getCurrentZoomRect());
+        }
+
         s.addToCaptureRequest(cc, camera.isFacingFront, captureBuilder);
 
         s.captureSession.stopRepeating();
@@ -539,7 +622,7 @@ public class CameraTwoEngine extends CameraEngine {
                                 CaptureRequest request,
                                 CaptureFailure failure) {
       getBus()
-        .post(new PictureTakenEvent(new RuntimeException("generic camera2 capture failure")));
+              .post(new PictureTakenEvent(new RuntimeException("generic camera2 capture failure")));
     }
 
     private void unlockFocus() {
@@ -586,6 +669,7 @@ public class CameraTwoEngine extends CameraEngine {
     private ArrayList<Size> previewSizes;
     private boolean isFacingFront;
     private final Integer facing;
+    private Rect mCurrentZoomRect = null;
 
     private Descriptor(String cameraId, CameraCharacteristics cc) {
       this.cameraId=cameraId;
@@ -648,6 +732,14 @@ public class CameraTwoEngine extends CameraEngine {
       }
 
       return(score);
+    }
+
+    public Rect getCurrentZoomRect() {
+      return mCurrentZoomRect;
+    }
+
+    public void setCurrentZoomRect(Rect mCurrentZoomRect) {
+      this.mCurrentZoomRect = mCurrentZoomRect;
     }
   }
 

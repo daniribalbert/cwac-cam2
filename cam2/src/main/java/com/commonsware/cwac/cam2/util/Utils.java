@@ -14,16 +14,20 @@
 
 package com.commonsware.cwac.cam2.util;
 
-import android.Manifest;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Rect;
+import android.hardware.camera2.CameraCharacteristics;
 import android.os.Build;
 import android.util.DisplayMetrics;
+
 import com.commonsware.cwac.cam2.CameraActivity;
 import com.commonsware.cwac.cam2.CameraDescriptor;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -154,6 +158,20 @@ public class Utils {
       return Long.signum((long) lhs.getWidth() * lhs.getHeight() -
           (long) rhs.getWidth() * rhs.getHeight());
     }
+  }
 
+  /**
+   * Calculates sensor crop region for a zoom level (zoom >= 1.0).
+   *
+   * @return Crop region.
+   */
+  @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+  public static Rect cropRegionForZoom(CameraCharacteristics characteristics, float zoom) {
+    Rect sensor = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+    int xCenter = sensor.width() / 2;
+    int yCenter = sensor.height() / 2;
+    int xDelta = (int) (0.5f * sensor.width() / zoom);
+    int yDelta = (int) (0.5f * sensor.height() / zoom);
+    return new Rect(xCenter - xDelta, yCenter - yDelta, xCenter + xDelta, yCenter + yDelta);
   }
 }

@@ -26,15 +26,19 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
-import android.widget.FrameLayout;
+
 import com.commonsware.cwac.cam2.util.Utils;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
 import de.greenrobot.event.EventBus;
 
 /**
@@ -148,6 +152,7 @@ abstract public class AbstractCameraActivity extends Activity {
   protected static final String TAG_CAMERA=CameraFragment.class.getCanonicalName();
   private static final int REQUEST_PERMS=13401;
   protected CameraFragment cameraFrag;
+  private ScaleGestureDetector mGestureDetector;
 
   /**
    * Standard lifecycle method, serving as the main entry
@@ -595,5 +600,44 @@ abstract public class AbstractCameraActivity extends Activity {
 
       return((T)this);
     }
+  }
+
+  @Override
+  public boolean dispatchTouchEvent(MotionEvent ev) {
+      if (mGestureDetector != null) {
+          mGestureDetector.onTouchEvent(ev);
+      }
+      return super.dispatchTouchEvent(ev);
+  }
+
+  private ScaleGestureDetector createGestureDetector() {
+      if (mGestureDetector == null) {
+          mGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
+      }
+      return mGestureDetector;
+  }
+
+  /**
+   * Listens to scaling events (two-finger pinch.)
+   * Sends out a zoom event.
+   */
+  private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
+
+    private final int OFFSET = 1000;
+       @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+          int currentScale = (int)(detector.getScaleFactor() * OFFSET);
+          CameraEngine.ZoomEvent.ZoomType zoomType = null;
+          if (currentScale > OFFSET) {
+              zoomType = CameraEngine.ZoomEvent.ZoomType.ZOOM_IN;
+          } else if (currentScale < OFFSET){
+              zoomType = CameraEngine.ZoomEvent.ZoomType.ZOOM_OUT;
+          }
+          if (zoomType != null) {
+              EventBus.getDefault().post(new CameraEngine.ZoomEvent(
+                      zoomType));
+          }
+          return true;
+      }
   }
 }

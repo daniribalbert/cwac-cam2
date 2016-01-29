@@ -19,15 +19,18 @@ import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import android.view.View;
+
 import com.commonsware.cwac.cam2.plugin.FlashModePlugin;
 import com.commonsware.cwac.cam2.plugin.FocusModePlugin;
 import com.commonsware.cwac.cam2.plugin.OrientationPlugin;
 import com.commonsware.cwac.cam2.plugin.SizeAndFormatPlugin;
 import com.commonsware.cwac.cam2.util.Size;
 import com.commonsware.cwac.cam2.util.Utils;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Queue;
+
 import de.greenrobot.event.EventBus;
 
 /**
@@ -260,11 +263,10 @@ public class CameraController implements CameraView.StateCallback {
         session=engine
             .buildSession(cv.getContext(), camera)
             .addPlugin(new SizeAndFormatPlugin(previewSize,
-              largest, ImageFormat.JPEG))
+                    largest, ImageFormat.JPEG))
             .addPlugin(new OrientationPlugin(cv.getContext()))
             .addPlugin(new FocusModePlugin(cv.getContext(), focusMode, isVideo))
-            .addPlugin(
-              new FlashModePlugin(flashModes))
+            .addPlugin(new FlashModePlugin(flashModes))
             .build();
 
         session.setPreviewSize(previewSize);
@@ -320,6 +322,13 @@ public class CameraController implements CameraView.StateCallback {
   public void onEventMainThread(CameraEngine.OrientationChangedEvent event) {
     if (engine!=null) {
       engine.handleOrientationChange(session, event);
+    }
+  }
+
+  @SuppressWarnings("unused")
+  public void onEventMainThread(CameraEngine.ZoomEvent event){
+    if (engine!=null) {
+      engine.handleZoomChange(session, event.getEventType());
     }
   }
 
