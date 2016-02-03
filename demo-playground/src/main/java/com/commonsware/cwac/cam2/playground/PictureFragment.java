@@ -20,13 +20,14 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceFragment;
-import android.provider.MediaStore;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+
 import com.commonsware.cwac.cam2.AbstractCameraActivity;
 import com.commonsware.cwac.cam2.CameraActivity;
 import com.commonsware.cwac.cam2.FlashMode;
+
 import java.io.File;
 
 public class PictureFragment extends PreferenceFragment {
@@ -152,6 +153,7 @@ public class PictureFragment extends PreferenceFragment {
         b.flashMode(FlashMode.REDEYE);
         break;
     }
+    b.zoom(true);
 
     Intent result;
 

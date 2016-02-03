@@ -149,6 +149,12 @@ abstract public class AbstractCameraActivity extends Activity {
    */
   public static final String EXTRA_FOCUS_MODE="cwac_cam2_focus_mode";
 
+  /**
+   * Extra name for zoom to apply. Value is true/false if zooming
+   * is enable/disable.
+   */
+  public static final String EXTRA_ZOOM_ENABLE="cwac_cam2_zoom_enable";
+
   protected static final String TAG_CAMERA=CameraFragment.class.getCanonicalName();
   private static final int REQUEST_PERMS=13401;
   protected CameraFragment cameraFrag;
@@ -344,6 +350,12 @@ abstract public class AbstractCameraActivity extends Activity {
       ctrl.setEngine(CameraEngine.buildInstance(this, forceClassic), criteria);
       ctrl.getEngine().setDebug(getIntent().getBooleanExtra(EXTRA_DEBUG_ENABLED, false));
       configEngine(ctrl.getEngine());
+
+      //Zoom
+      boolean zoomEnable = getIntent().getBooleanExtra(EXTRA_ZOOM_ENABLE, true);
+      if (zoomEnable) {
+        createGestureDetector();
+      }
 
       getFragmentManager()
         .beginTransaction()
@@ -554,6 +566,17 @@ abstract public class AbstractCameraActivity extends Activity {
      */
     public T focusMode(FocusMode focusMode) {
       result.putExtra(EXTRA_FOCUS_MODE, focusMode);
+
+      return((T)this);
+    }
+
+    /**
+     * Sets zoom enable/disable. Default is enable.
+     *
+     * @return the builder, for further configuration
+     */
+    public T zoom(boolean zoomEnable) {
+      result.putExtra(EXTRA_ZOOM_ENABLE, zoomEnable);
 
       return((T)this);
     }

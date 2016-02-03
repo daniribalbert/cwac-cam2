@@ -286,6 +286,7 @@ public class MainActivity extends Activity {
         .debug()
         .debugSavePreviewFrame()
         .flashMode(FlashMode.ALWAYS)
+        .zoom(true)
         .build();
 
     startActivityForResult(i, REQUEST_PORTRAIT_RFC);
